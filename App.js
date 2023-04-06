@@ -29,7 +29,7 @@ const data = Object.keys(images).map((i) => ({
   image: images[i],
   ref: createRef(),
 }));
-const waitFor = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const Tabs = ({ data, scrollX, onItemPress }) => {
   const containerRef = useRef();
   const [measures, setMeasures] = React.useState([]);
