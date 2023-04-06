@@ -1,4 +1,4 @@
-import React, { useRef, createRef } from "react";
+import React, { useRef, createRef, useEffect, useCallback } from "react";
 import { StatusBar } from "expo-status-bar";
 import {
   findNodeHandle,
@@ -29,60 +29,36 @@ const data = Object.keys(images).map((i) => ({
   image: images[i],
   ref: createRef(),
 }));
-const Tab = React.forwardRef(({ item, onItemPress }, ref) => {
-  return (
-    <TouchableOpacity onPress={onItemPress}>
-      <View ref={ref}>
-        <Text
-          style={{
-            color: "white",
-            fontSize: 84 / data.length,
-            fontWeight: "800",
-            textTransform: "uppercase",
-          }}
-        >
-          {item.title}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-});
-
-const Indicator = ({ measures, scrollX }) => {
-  const inputRange = data.map((_, i) => i * width);
-  const indicatorWidth = scrollX.interpolate({
-    inputRange,
-    outputRange: measures.map((measure) => measure.width),
-  });
-  const translateX = scrollX.interpolate({
-    inputRange,
-    outputRange: measures.map((measure) => measure.x),
-  });
-  return (
-    <Animated.View
-      style={{
-        position: "absolute",
-        backgroundColor: "white",
-        height: 4,
-        width: indicatorWidth,
-        left: 0,
-        bottom: -10,
-        transform: [
-          {
-            translateX,
-          },
-        ],
-      }}
-    ></Animated.View>
-  );
-};
-
+const waitFor = (ms) => new Promise((r) => setTimeout(r, ms));
 const Tabs = ({ data, scrollX, onItemPress }) => {
-  const [measures, setMeasures] = React.useState([]);
   const containerRef = useRef();
-  React.useEffect(() => {
-    let m = [];
-    data.forEach((item) => {
+  const [measures, setMeasures] = React.useState([]);
+  let m = [];
+
+  useEffect(() => {
+    function runRef() {
+      data.forEach(async (item) => {
+        item.ref.current.measureLayout(
+          containerRef.current,
+          (x, y, width, height) => {
+            m.push({
+              x,
+              y,
+              width,
+              height,
+            });
+
+            if (m.length === data.length) {
+              setMeasures(m);
+            }
+          }
+        );
+      });
+    }
+    runRef();
+  }, []);
+  const getRef = useCallback(() => {
+    data.forEach(async (item) => {
       item.ref.current.measureLayout(
         containerRef.current,
         (x, y, width, height) => {
@@ -93,14 +69,17 @@ const Tabs = ({ data, scrollX, onItemPress }) => {
             height,
           });
 
-          if (m.length === data.length) {
+          if (m.length === data.length && m[0].width > 0) {
             setMeasures(m);
           }
         }
       );
     });
-  }, []);
-
+  }, [measures]);
+  useEffect(() => {
+    if (measures.length > 0 && measures[0]?.width === 0) getRef();
+  }, [measures]);
+  console.log(measures);
   return (
     <View style={{ position: "absolute", top: 100, width }}>
       <View
@@ -130,6 +109,56 @@ const Tabs = ({ data, scrollX, onItemPress }) => {
     </View>
   );
 };
+const Tab = React.forwardRef(({ item, onItemPress }, ref) => {
+  return (
+    <TouchableOpacity onPress={onItemPress}>
+      <View ref={ref}>
+        <Text
+          style={{
+            color: "white",
+            fontSize: 84 / data.length,
+            fontWeight: "800",
+            textTransform: "uppercase",
+          }}
+        >
+          {item.title}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+const Indicator = ({ measures, scrollX }) => {
+  // console.log("here");
+  const inputRange = data.map((_, i) => i * width);
+  const indicatorWidth = scrollX.interpolate({
+    inputRange,
+    outputRange: measures.map((measure) => measure.width),
+  });
+  const translateX = scrollX.interpolate({
+    inputRange,
+    outputRange: measures.map((measure) => measure.x),
+  });
+
+  return (
+    <Animated.View
+      style={{
+        position: "absolute",
+        backgroundColor: "white",
+        height: 4,
+        width: indicatorWidth,
+        left: 0,
+        bottom: -10,
+        transform: [
+          {
+            translateX,
+          },
+        ],
+      }}
+    ></Animated.View>
+  );
+};
+
 export default function App() {
   const scrollX = useRef(new Animated.Value(0)).current;
   const ref = useRef();
